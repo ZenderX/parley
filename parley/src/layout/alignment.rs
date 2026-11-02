@@ -34,12 +34,17 @@ pub enum Alignment {
 }
 
 /// Additional options to fine tune alignment
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AlignmentOptions {
     /// If set to `true`, "end" and "center" alignment will apply even if the line contents are
     /// wider than the alignment width. If it is set to `false`, all overflowing lines will be
     /// [`Alignment::Start`] aligned.
     pub align_when_overflowing: bool,
+    /// The alignment of the lines that end a paragraph: the last line, and each line ended
+    /// by an explicit break (CSS `text-align-last`). [`Alignment::Justify`] here justifies
+    /// them too. With `None` they take the layout's alignment, except that
+    /// [`Alignment::Justify`] leaves them start-aligned.
+    pub last_line_alignment: Option<Alignment>,
 }
 
 #[expect(
@@ -50,6 +55,7 @@ impl Default for AlignmentOptions {
     fn default() -> Self {
         Self {
             align_when_overflowing: false,
+            last_line_alignment: None,
         }
     }
 }
@@ -67,7 +73,9 @@ pub(crate) fn align<B: Brush>(
     {
         layout.alignment = Some(alignment);
     }
-    layout.is_aligned_justified = alignment == Alignment::Justify;
+    let justifies =
+        alignment == Alignment::Justify || options.last_line_alignment == Some(Alignment::Justify);
+    layout.justified_with = justifies.then_some((alignment, options));
 
     align_impl::<_, false>(layout, alignment, options);
 }
@@ -77,9 +85,8 @@ pub(crate) fn align<B: Brush>(
 /// This is part of resetting state in preparation for re-line-breaking or re-aligning the same
 /// layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
-    if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justify, AlignmentOptions::default());
-        layout.is_aligned_justified = false;
+    if let Some((alignment, options)) = layout.justified_with.take() {
+        align_impl::<_, true>(layout, alignment, options);
     }
 }
 
@@ -126,7 +133,13 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
             continue;
         }
 
-        match (alignment, is_rtl) {
+        let ends_paragraph = matches!(line.break_reason, BreakReason::None | BreakReason::Explicit);
+        let line_alignment = match options.last_line_alignment {
+            Some(last) if ends_paragraph => last,
+            _ => alignment,
+        };
+
+        match (line_alignment, is_rtl) {
             (Alignment::Left, _) | (Alignment::Start, false) | (Alignment::End, true) => {
                 // Do nothing
             }
@@ -143,11 +156,11 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 }
 
                 // Justified alignment doesn't apply to the last line of a paragraph
-                // (`BreakReason::None`), (`BreakReason::Explicit`) or if there are no whitespace
-                // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
+                // (`BreakReason::None`), (`BreakReason::Explicit`) unless
+                // `last_line_alignment` asks for it, or if there are no whitespace gaps to
+                // adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
-                if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
-                    || line.num_spaces == 0
+                if (ends_paragraph && options.last_line_alignment.is_none()) || line.num_spaces == 0
                 {
                     if is_rtl {
                         line.metrics.offset += free_space;

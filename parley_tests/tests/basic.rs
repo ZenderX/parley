@@ -591,6 +591,7 @@ fn realign_all() {
             None,
             AlignmentOptions {
                 align_when_overflowing: true,
+                ..AlignmentOptions::default()
             },
             "none",
             "awo_true",
@@ -599,9 +600,20 @@ fn realign_all() {
             None,
             AlignmentOptions {
                 align_when_overflowing: false,
+                ..AlignmentOptions::default()
             },
             "none",
             "awo_false",
+        ),
+        // Justifying the last line must be undone as exactly as the other lines.
+        (
+            Some(150.),
+            AlignmentOptions {
+                last_line_alignment: Some(Alignment::Justify),
+                ..AlignmentOptions::default()
+            },
+            "150",
+            "last_justify",
         ),
     ];
 

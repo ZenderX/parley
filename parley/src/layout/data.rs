@@ -306,8 +306,9 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Directly store the alignment if accessibility is enabled so we can
     /// set the corresponding AccessKit property.
     pub(crate) alignment: Option<super::Alignment>,
-    /// Whether the layout is aligned with [`crate::Alignment::Justify`].
-    pub(crate) is_aligned_justified: bool,
+    /// The alignment and options of the last [`crate::Layout::align`], when it justified
+    /// any line, so the justification can be undone line for line.
+    pub(crate) justified_with: Option<(super::Alignment, super::AlignmentOptions)>,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
@@ -336,7 +337,7 @@ impl<B: Brush> Default for LayoutData<B> {
             line_items: Vec::new(),
             #[cfg(feature = "accesskit")]
             alignment: None,
-            is_aligned_justified: false,
+            justified_with: None,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),

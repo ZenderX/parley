@@ -69,8 +69,8 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
 
     // Output of alignment
     assert_eq!(
-        a.is_aligned_justified, b.is_aligned_justified,
-        "{case} is_aligned_justified mismatch"
+        a.justified_with, b.justified_with,
+        "{case} justified_with mismatch"
     );
     assert_eq!(
         a.layout_max_advance, b.layout_max_advance,
